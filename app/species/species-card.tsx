@@ -12,7 +12,7 @@ can cause errors with matching props and state in child components if the list o
 */
 import type { Database } from "@/lib/schema";
 import Image from "next/image";
-import SpeciesDetailsDialog from "./species-details.dialog";
+import SpeciesDetailsDialog from "./species-details-dialog";
 type Species = Database["public"]["Tables"]["species"]["Row"];
 
 export default function SpeciesCard({ species }: { species: Species }) {
