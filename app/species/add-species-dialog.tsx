@@ -173,7 +173,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
 
     const description: string = searchData.extract;
     const common_name: string = searchData.titles.normalized; // The page title is often the common name
-    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] || "N/A";
+    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] ?? "N/A";
     const image: string = searchData.originalimage.source;
 
     defaultValues = {
