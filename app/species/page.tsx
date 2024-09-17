@@ -1,11 +1,15 @@
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { TypographyH2 } from "@/components/ui/typography";
 import { createServerSupabaseClient } from "@/lib/server-utils";
 import { redirect } from "next/navigation";
 import AddSpeciesDialog from "./add-species-dialog";
 import SpeciesCard from "./species-card";
+import SpeciesSearch from "./species-search";
 
 export default async function SpeciesList() {
+  const searchInput = "";
+
   // Create supabase server component client and obtain user session from stored cookie
   const supabase = createServerSupabaseClient();
   const {
@@ -27,10 +31,12 @@ export default async function SpeciesList() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <TypographyH2>Species List</TypographyH2>
         <AddSpeciesDialog userId={sessionId} />
+        <Input type="text" placeholder="Search here" />
+        <SpeciesSearch input={searchInput}></SpeciesSearch>;
       </div>
       <Separator className="my-4" />
       <div className="flex flex-wrap justify-center">
-        {species?.map((species) => <SpeciesCard key={species.id} species={species} />)}
+        {species?.map((species) => <SpeciesCard key={species.id} species={species} currentUser={sessionId} />)}
       </div>
     </>
   );

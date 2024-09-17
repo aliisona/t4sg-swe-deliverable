@@ -54,6 +54,7 @@ const speciesSchema = z.object({
     .nullable()
     // Transform empty string or only whitespace input to null before form submission, and trim whitespace otherwise
     .transform((val) => (!val || val.trim() === "" ? null : val.trim())),
+  endangered: z.boolean().nullable(),
 });
 
 type FormData = z.infer<typeof speciesSchema>;
@@ -65,7 +66,7 @@ Otherwise, they will be `undefined` by default, which will raise warnings becaus
 All form fields should be set to non-undefined default values.
 Read more here: https://legacy.react-hook-form.com/api/useform/
 */
-const defaultValues: Partial<FormData> = {
+let defaultValues: Partial<FormData> = {
   scientific_name: "",
   common_name: null,
   kingdom: "Animalia",
@@ -74,12 +75,16 @@ const defaultValues: Partial<FormData> = {
   description: null,
 };
 
+import { type Database } from "@/lib/schema";
+type Species = Database["public"]["Tables"]["species"]["Row"];
+
 export default function AddSpeciesDialog({ userId }: { userId: string }) {
   const router = useRouter();
 
   // Control open/closed state of the dialog
   const [open, setOpen] = useState<boolean>(false);
-
+  const [searchSpecies, setSearchSpecies] = useState("");
+  const [searchSpeciesData, setSearchSpeciesData] = useState();
   // Instantiate form functionality with React Hook Form, passing in the Zod schema (for validation) and default values
   const form = useForm<FormData>({
     resolver: zodResolver(speciesSchema),
@@ -99,6 +104,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
         scientific_name: input.scientific_name,
         total_population: input.total_population,
         image: input.image,
+        endangered: input.endangered,
       },
     ]);
 
@@ -125,8 +131,58 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
 
     return toast({
       title: "New species added!",
-      description: "Successfully added " + input.scientific_name + ".",
+      description: "Successfully added " + input.common_name + ".",
     });
+  };
+
+  // Define types for the Wikipedia API responses
+  interface WikipediaSummary {
+    titles: {
+      canonical: string;
+      normalized: string;
+      display: string;
+    };
+    pageid: string;
+    originalimage: {
+      source: string;
+      width: string;
+      height: string;
+    };
+    lang: string;
+    dir: string;
+    revision: string;
+    tid: string;
+    timestamp: string;
+    description: string;
+    description_source: string;
+    content_urls: {};
+    mobile: string;
+    extract: string;
+  }
+
+  const handleSearch = async () => {
+    if (searchSpecies === "") return;
+    const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${searchSpecies}`);
+    const searchData = (await response.json()) as WikipediaSummary;
+
+    const description: string = searchData.extract;
+    const common_name: string = searchData.titles.normalized; // The page title is often the common name
+    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] || "N/A";
+    const image: string = searchData.originalimage.source;
+
+    defaultValues = {
+      scientific_name: scientific_name,
+      common_name: common_name,
+      kingdom: "Animalia",
+      total_population: null,
+      image: image,
+      description: description,
+      endangered: false,
+    };
+
+    form.reset(defaultValues);
+
+    console.log(defaultValues);
   };
 
   return (
@@ -144,7 +200,17 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
             Add a new species here. Click &quot;Add Species&quot; below when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
+
         <Form {...form}>
+          <input
+            type="text"
+            value={searchSpecies}
+            onChange={(e) => setSearchSpecies(e.target.value)}
+            placeholder="Type an animal to autofill some fields"
+          />
+          <Button onClick={handleSearch} className="ml-1 mr-1 flex-auto">
+            Search!
+          </Button>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
             <div className="grid w-full items-center gap-4">
               <FormField
@@ -171,6 +237,22 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                       <FormLabel>Common Name</FormLabel>
                       <FormControl>
                         <Input value={value ?? ""} placeholder="Guinea pig" {...rest} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+              <FormField
+                control={form.control}
+                name="endangered"
+                render={({ field }) => {
+                  const { value, ...rest } = field;
+                  return (
+                    <FormItem>
+                      <FormLabel>Endangered</FormLabel>
+                      <FormControl>
+                        <Input type="checkbox" checked={value ?? false} {...rest} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
