@@ -154,7 +154,14 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
     timestamp: string;
     description: string;
     description_source: string;
-    content_urls: {};
+    content_urls: {
+      desktop: {
+        page: string;
+        revisions: string;
+        edit: string;
+        talk: string;
+      };
+    };
     mobile: string;
     extract: string;
   }
