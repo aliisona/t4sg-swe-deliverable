@@ -1,10 +1,8 @@
 "use client";
 
-import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -19,7 +17,7 @@ import { toast } from "@/components/ui/use-toast";
 import { createBrowserSupabaseClient } from "@/lib/client-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState, type BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent, type MouseEvent } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -55,37 +53,31 @@ const speciesSchema = z.object({
     // Transform empty string or only whitespace input to null before form submission, and trim whitespace otherwise
     .transform((val) => (!val || val.trim() === "" ? null : val.trim())),
   endangered: z.boolean().nullable(),
+  // Transform empty string or only whitespace input to null before form submission, and trim whitespace otherwise
 });
 
 type FormData = z.infer<typeof speciesSchema>;
 
-// Default values for the form fields.
-/* Because the react-hook-form (RHF) used here is a controlled form (not an uncontrolled form),
-fields that are nullable/not required should explicitly be set to `null` by default.
-Otherwise, they will be `undefined` by default, which will raise warnings because `undefined` conflicts with controlled components.
-All form fields should be set to non-undefined default values.
-Read more here: https://legacy.react-hook-form.com/api/useform/
-*/
-let defaultValues: Partial<FormData> = {
-  scientific_name: "",
-  common_name: null,
-  kingdom: "Animalia",
-  total_population: null,
-  image: null,
-  description: null,
-};
-
 import { type Database } from "@/lib/schema";
+
 type Species = Database["public"]["Tables"]["species"]["Row"];
 
-export default function AddSpeciesDialog({ userId }: { userId: string }) {
+export default function SpeciesDetailsDialog({ species, currentUser }: { species: Species; currentUser: string }) {
   const router = useRouter();
 
-  // Control open/closed state of the dialog
-  const [open, setOpen] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [searchSpecies, setSearchSpecies] = useState("");
-  const [searchSpeciesData, setSearchSpeciesData] = useState();
-  // Instantiate form functionality with React Hook Form, passing in the Zod schema (for validation) and default values
+
+  const defaultValues: Partial<FormData> = {
+    scientific_name: species.scientific_name,
+    common_name: species.common_name,
+    kingdom: species.kingdom,
+    total_population: species.total_population,
+    image: species.image,
+    description: species.description,
+    endangered: species.endangered,
+  };
+
   const form = useForm<FormData>({
     resolver: zodResolver(speciesSchema),
     defaultValues,
@@ -93,22 +85,9 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   });
 
   const onSubmit = async (input: FormData) => {
-    // The `input` prop contains data that has already been processed by zod. We can now use it in a supabase query
     const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.from("species").insert([
-      {
-        author: userId,
-        common_name: input.common_name,
-        description: input.description,
-        kingdom: input.kingdom,
-        scientific_name: input.scientific_name,
-        total_population: input.total_population,
-        image: input.image,
-        endangered: input.endangered,
-      },
-    ]);
-
-    // Catch and report errors from Supabase and exit the onSubmit function with an early 'return' if an error occurred.
+    const { error } = await supabase.from("species").update(input).eq("id", species.id);
+    // console.log(input);
     if (error) {
       return toast({
         title: "Something went wrong.",
@@ -117,100 +96,63 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
       });
     }
 
-    // Because Supabase errors were caught above, the remainder of the function will only execute upon a successful edit
+    setIsEditing(false);
 
-    // Reset form values to the default (empty) values.
-    // Practically, this line can be removed because router.refresh() also resets the form. However, we left it as a reminder that you should generally consider form "cleanup" after an add/edit operation.
-    form.reset(defaultValues);
-
-    setOpen(false);
-
-    // Refresh all server components in the current route. This helps display the newly created species because species are fetched in a server component, species/page.tsx.
-    // Refreshing that server component will display the new species from Supabase
+    form.reset(input);
     router.refresh();
 
     return toast({
-      title: "New species added!",
-      description: "Successfully added " + input.common_name + ".",
+      title: "Changes saved.",
+      description: "Saved your changes to " + species.common_name + " <3!",
     });
   };
 
-  // Define types for the Wikipedia API responses
-  interface WikipediaSummary {
-    titles: {
-      canonical: string;
-      normalized: string;
-      display: string;
-    };
-    pageid: string;
-    originalimage: {
-      source: string;
-      width: string;
-      height: string;
-    };
-    lang: string;
-    dir: string;
-    revision: string;
-    tid: string;
-    timestamp: string;
-    description: string;
-    description_source: string;
-    content_urls: {};
-    mobile: string;
-    extract: string;
-  }
+  const startEditing = (e: MouseEvent) => {
+    e.preventDefault();
+    setIsEditing(true);
+  };
 
-  const handleSearch = async () => {
-    if (searchSpecies === "") return;
-    const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${searchSpecies}`);
-    const searchData = (await response.json()) as WikipediaSummary;
+  const handleCancel = (e: MouseEvent) => {
+    e.preventDefault();
+    if (window.confirm("Are you sure you want to cancel?")) {
+      form.reset(defaultValues);
+      setIsEditing(false);
+    }
+  };
 
-    const description: string = searchData.extract;
-    const common_name: string = searchData.titles.normalized; // The page title is often the common name
-    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] || "N/A";
-    const image: string = searchData.originalimage.source;
+  const handleDelete = async (e: MouseEvent) => {
+    e.preventDefault();
+    if (window.confirm("Are you sure you want to delete? This action cannot be undone!")) {
+      const supabase = createBrowserSupabaseClient();
+      const { error } = await supabase.from("species").delete().eq("id", species.id);
+      // console.log(input);
+      if (error) {
+        return toast({
+          title: "Something went wrong.",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+      router.refresh();
 
-    defaultValues = {
-      scientific_name: scientific_name,
-      common_name: common_name,
-      kingdom: "Animalia",
-      total_population: null,
-      image: image,
-      description: description,
-      endangered: false,
-    };
-
-    form.reset(defaultValues);
-
-    console.log(defaultValues);
+      return toast({
+        title: "Delete saved.",
+        description: "Deleted " + species.common_name + " :(",
+      });
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog>
       <DialogTrigger asChild>
-        <Button variant="secondary">
-          <Icons.add className="mr-3 h-5 w-5" />
-          Add Species
-        </Button>
+        <Button className="mt-3 w-full">Learn More</Button>
       </DialogTrigger>
       <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Add Species</DialogTitle>
-          <DialogDescription>
-            Add a new species here. Click &quot;Add Species&quot; below when you&apos;re done.
-          </DialogDescription>
+          <DialogTitle>{species.scientific_name}</DialogTitle>
+          {species.common_name && <DialogDescription>{species.common_name}</DialogDescription>}
         </DialogHeader>
-
         <Form {...form}>
-          <input
-            type="text"
-            value={searchSpecies}
-            onChange={(e) => setSearchSpecies(e.target.value)}
-            placeholder="Type an animal to autofill some fields"
-          />
-          <Button onClick={handleSearch} className="ml-1 mr-1 flex-auto">
-            Search!
-          </Button>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
             <div className="grid w-full items-center gap-4">
               <FormField
@@ -220,7 +162,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                   <FormItem>
                     <FormLabel>Scientific Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Cavia porcellus" {...field} />
+                      <Input readOnly={!isEditing} placeholder="" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -236,7 +178,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                     <FormItem>
                       <FormLabel>Common Name</FormLabel>
                       <FormControl>
-                        <Input value={value ?? ""} placeholder="Guinea pig" {...rest} />
+                        <Input readOnly={!isEditing} value={value ?? ""} placeholder="" {...rest} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -247,12 +189,19 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                 control={form.control}
                 name="endangered"
                 render={({ field }) => {
+                  // We must extract value from field and convert a potential defaultValue of `null` to "" because textareas can't handle null values: https://github.com/orgs/react-hook-form/discussions/4091
                   const { value, ...rest } = field;
                   return (
                     <FormItem>
                       <FormLabel>Endangered</FormLabel>
                       <FormControl>
-                        <Input type="checkbox" checked={value ?? false} {...rest} />
+                        <Input
+                          {...rest}
+                          readOnly={!isEditing}
+                          type="checkbox"
+                          checked={value ?? false}
+                          disabled={!isEditing}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -265,10 +214,14 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Kingdom</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(kingdoms.parse(value))} value={field.value}>
+                    <Select
+                      disabled={!isEditing}
+                      onValueChange={(value) => field.onChange(kingdoms.parse(value))}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a kingdom" />
+                          <SelectValue placeholder="" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -296,9 +249,10 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                       <FormControl>
                         {/* Using shadcn/ui form with number: https://github.com/shadcn-ui/ui/issues/421 */}
                         <Input
+                          readOnly={!isEditing}
                           type="number"
                           value={value ?? ""}
-                          placeholder="300000"
+                          placeholder=""
                           {...rest}
                           onChange={(event) => field.onChange(+event.target.value)}
                         />
@@ -318,11 +272,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                     <FormItem>
                       <FormLabel>Image URL</FormLabel>
                       <FormControl>
-                        <Input
-                          value={value ?? ""}
-                          placeholder="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/George_the_amazing_guinea_pig.jpg/440px-George_the_amazing_guinea_pig.jpg"
-                          {...rest}
-                        />
+                        <Input readOnly={!isEditing} value={value ?? ""} placeholder="" {...rest} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -339,30 +289,40 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea
-                          value={value ?? ""}
-                          placeholder="The guinea pig or domestic guinea pig, also known as the cavy or domestic cavy, is a species of rodent belonging to the genus Cavia in the family Caviidae."
-                          {...rest}
-                        />
+                        <Textarea readOnly={!isEditing} value={value ?? ""} placeholder="" {...rest} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   );
                 }}
               />
-              <div className="flex">
-                <Button type="submit" className="ml-1 mr-1 flex-auto">
-                  Add Species
-                </Button>
-                <DialogClose asChild>
-                  <Button type="button" className="ml-1 mr-1 flex-auto" variant="secondary">
-                    Cancel
-                  </Button>
-                </DialogClose>
-              </div>
+              {currentUser == species.author && (
+                <div className="flex">
+                  {isEditing ? (
+                    <>
+                      <Button type="submit" className="ml-1 mr-1 flex-auto">
+                        Confirm
+                      </Button>
+
+                      <Button onClick={handleCancel} className="ml-1 mr-1 flex-auto" variant="secondary">
+                        {" "}
+                        Cancel{" "}
+                      </Button>
+
+                      <Button onClick={(e) => void handleDelete(e)} className="ml-1 mr-1 flex-auto" variant="secondary">
+                        Delete Species
+                      </Button>
+                    </>
+                  ) : (
+                    <Button onClick={startEditing} className="ml-1 mr-1 flex-auto">
+                      Edit Species
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </form>
-        </Form>
+        </Form>{" "}
       </DialogContent>
     </Dialog>
   );

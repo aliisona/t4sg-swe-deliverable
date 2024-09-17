@@ -18,7 +18,6 @@ const sidebarNavItems = [
 interface SettingsLayoutProps {
   children: React.ReactNode;
 }
-
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
   // Create supabase server component client and obtain user session from stored cookie
   const supabase = createServerSupabaseClient();
