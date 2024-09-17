@@ -84,7 +84,6 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   // Control open/closed state of the dialog
   const [open, setOpen] = useState<boolean>(false);
   const [searchSpecies, setSearchSpecies] = useState("");
-  const [searchSpeciesData, setSearchSpeciesData] = useState();
   // Instantiate form functionality with React Hook Form, passing in the Zod schema (for validation) and default values
   const form = useForm<FormData>({
     resolver: zodResolver(speciesSchema),
