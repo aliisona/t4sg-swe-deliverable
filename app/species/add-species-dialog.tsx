@@ -120,6 +120,16 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
 
     // Reset form values to the default (empty) values.
     // Practically, this line can be removed because router.refresh() also resets the form. However, we left it as a reminder that you should generally consider form "cleanup" after an add/edit operation.
+    defaultValues = {
+      //reset default values to empty val, just to clear from before
+      scientific_name: "",
+      common_name: null,
+      kingdom: "Animalia",
+      total_population: null,
+      image: null,
+      description: null,
+    };
+    setSearchSpecies("");
     form.reset(defaultValues);
 
     setOpen(false);
@@ -174,7 +184,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
 
     const description: string = searchData.extract;
     const common_name: string = searchData.titles.normalized; // The page title is often the common name
-    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] ?? "N/A";
+    const scientific_name: string = description.match(/\((.*?)\)/)?.[1] ?? "";
     const image: string = searchData.originalimage.source;
 
     defaultValues = {
