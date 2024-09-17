@@ -19,7 +19,7 @@ import { toast } from "@/components/ui/use-toast";
 import { createBrowserSupabaseClient } from "@/lib/client-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState, type BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent, type MouseEvent } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -74,6 +74,9 @@ let defaultValues: Partial<FormData> = {
   image: null,
   description: null,
 };
+
+// import { type Database } from "@/lib/schema";
+// type Species = Database["public"]["Tables"]["species"]["Row"];
 
 export default function AddSpeciesDialog({ userId }: { userId: string }) {
   const router = useRouter();
@@ -163,7 +166,8 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
     extract: string;
   }
 
-  const handleSearch = async () => {
+  const handleSearch = async (e: MouseEvent) => {
+    e.preventDefault();
     if (searchSpecies === "") return;
     const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${searchSpecies}`);
     const searchData = (await response.json()) as WikipediaSummary;
@@ -211,7 +215,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
             onChange={(e) => setSearchSpecies(e.target.value)}
             placeholder="Type an animal to autofill some fields"
           />
-          <Button onClick={void handleSearch} className="ml-1 mr-1 flex-auto">
+          <Button onClick={(e) => void handleSearch(e)} className="ml-1 mr-1 flex-auto">
             Search!
           </Button>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
