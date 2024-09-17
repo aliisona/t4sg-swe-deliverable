@@ -66,7 +66,6 @@ export default function SpeciesDetailsDialog({ species, currentUser }: { species
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [searchSpecies, setSearchSpecies] = useState("");
 
   const defaultValues: Partial<FormData> = {
     scientific_name: species.scientific_name,

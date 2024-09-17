@@ -75,9 +75,6 @@ let defaultValues: Partial<FormData> = {
   description: null,
 };
 
-import { type Database } from "@/lib/schema";
-type Species = Database["public"]["Tables"]["species"]["Row"];
-
 export default function AddSpeciesDialog({ userId }: { userId: string }) {
   const router = useRouter();
 
@@ -214,7 +211,7 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
             onChange={(e) => setSearchSpecies(e.target.value)}
             placeholder="Type an animal to autofill some fields"
           />
-          <Button onClick={handleSearch} className="ml-1 mr-1 flex-auto">
+          <Button onClick={void handleSearch} className="ml-1 mr-1 flex-auto">
             Search!
           </Button>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
